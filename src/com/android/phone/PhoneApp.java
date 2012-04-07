@@ -241,9 +241,9 @@ public class PhoneApp extends Application implements AccelerometerListener.Orien
 
     // Phone Plus Settings
     private static final String ACTION_VIBRATE_45 = "com.android.phone.PhoneApp.ACTION_VIBRATE_45";
-    private static PendingIntent mVibrateIntent;
-    private static Vibrator mVibrator = null;
-    private static AlarmManager mAM;
+    private PendingIntent mVibrateIntent;
+    private Vibrator mVibrator = null;
+    private AlarmManager mAM;
     private HandlerThread mVibrationThread;
     private Handler mVibrationHandler;
 
@@ -262,7 +262,7 @@ public class PhoneApp extends Application implements AccelerometerListener.Orien
         if (VDBG) Log.i(LOG_TAG, "am at: " + nextalarm);
         mAM.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, nextalarm, mVibrateIntent);
     }
-    public void stopVib45() {
+    private void stopVib45() {
         if (VDBG) Log.i(LOG_TAG, "vibrate stop @" + SystemClock.elapsedRealtime());
         mAM.cancel(mVibrateIntent);
     }
@@ -281,10 +281,6 @@ public class PhoneApp extends Application implements AccelerometerListener.Orien
     public void vibrate(int v1, int p1, int v2) {
         if (mVibrationThread == null) {
             mVibrationThread = new HandlerThread("Vibrate 45 handler");
-            mVibrationThread.start();
-            mVibrationHandler = new Handler(mVibrationThread.getLooper());
-        }
-        if (mVibrationThread.getState() == Thread.State.TERMINATED ) {
             mVibrationThread.start();
             mVibrationHandler = new Handler(mVibrationThread.getLooper());
         }
@@ -597,7 +593,6 @@ public class PhoneApp extends Application implements AccelerometerListener.Orien
             intentFilter.addAction(TelephonyIntents.ACTION_EMERGENCY_CALLBACK_MODE_CHANGED);
             intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
             intentFilter.addAction(Intent.ACTION_SCREEN_ON);
-
             intentFilter.addAction(ACTION_VIBRATE_45);
             if (mTtyEnabled) {
                 intentFilter.addAction(TtyIntent.TTY_PREFERRED_MODE_CHANGE_ACTION);
