@@ -38,35 +38,52 @@ public class PhoneToggler extends BroadcastReceiver  {
         return mHandler;
     }
 
-	@Override
-	public void onReceive(Context context, Intent intent) {
-		if (intent.getAction().equals(MODIFY_NETWORK_MODE)) {
-            if (DBG) {
-                Log.d(LOG_TAG,"Got modify intent");
-            }
-		if (intent.getExtras()!=null) {
-			int networkMode = intent.getExtras().getInt(NETWORK_MODE);
-			if (networkMode == Phone.NT_MODE_GSM_ONLY || networkMode == Phone.NT_MODE_WCDMA_PREF || networkMode == Phone.NT_MODE_WCDMA_ONLY) {
-                if (DBG) {
-                    Log.d(LOG_TAG,"Will modify it to: "+networkMode);
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent.getAction().equals(MODIFY_NETWORK_MODE)) {
+            if (DBG) Log.d(LOG_TAG,"Got modify intent");
+            if (intent.getExtras()!=null) {
+                int networkMode = intent.getExtras().getInt(NETWORK_MODE);
+                boolean networkModeOk = false;
+                int phoneType = getPhone().getPhoneType();
+                boolean isLteOnCdma = getPhone().getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE;
+
+                if (phoneType == Phone.PHONE_TYPE_GSM) {
+                    if (networkMode == Phone.NT_MODE_GSM_ONLY
+                            || networkMode == Phone.NT_MODE_GSM_UMTS
+                            || networkMode == Phone.NT_MODE_WCDMA_PREF
+                            || networkMode == Phone.NT_MODE_LTE_GSM_WCDMA
+                            || networkMode == Phone.NT_MODE_WCDMA_ONLY) {
+                        networkModeOk = true;
+                    }
+                } else if (phoneType == Phone.PHONE_TYPE_CDMA) {
+                    if (networkMode == Phone.NT_MODE_CDMA
+                            || networkMode == Phone.NT_MODE_CDMA_NO_EVDO
+                            || networkMode == Phone.NT_MODE_EVDO_NO_CDMA) {
+                        networkModeOk = true;
+                    }
                 }
-				changeNetworkMode(networkMode);
-                if (DBG) {
-                    log("Accepted modification of network mode to :"+networkMode);
+                if (context.getResources().getBoolean(R.bool.world_phone) || isLteOnCdma) {
+                    if (networkMode == Phone.NT_MODE_GLOBAL) {
+                        networkModeOk = true;
+                    }
                 }
-			} else {
-				Log.e(LOG_TAG,"Not accepted network mode: "+networkMode);
-			}
-		}
-		} else if (intent.getAction().equals(REQUEST_NETWORK_MODE)) {
-            if (DBG) {
-                Log.d(LOG_TAG,"Sending Intent with current phone network mode");
+
+                if (networkModeOk) {
+                    if (DBG) Log.d(LOG_TAG,"Will modify it to: "+networkMode);
+                    changeNetworkMode(networkMode);
+                    if (DBG) Log.d(LOG_TAG,"Accepted modification of network mode to : "+networkMode);
+                } else {
+                    Log.e(LOG_TAG,"Not accepted network mode: "+networkMode);
+                }
             }
-			triggerIntent();
-		} else {
-			Log.e(LOG_TAG,"Not accepted intent: "+intent.getAction());
-		}
-	}
+        } else if (intent.getAction().equals(REQUEST_NETWORK_MODE)) {
+            if (DBG) Log.d(LOG_TAG,"Sending Intent with current phone network mode");
+            triggerIntent();
+        } else {
+            Log.e(LOG_TAG,"Not accepted intent: "+intent.getAction());
+        }
+    }
 
     private void changeNetworkMode(int modemNetworkMode) {
         getPhone().setPreferredNetworkType(modemNetworkMode, getHandler()
@@ -102,27 +119,20 @@ public class PhoneToggler extends BroadcastReceiver  {
 
             if (ar.exception == null) {
                 int modemNetworkMode = ((int[])ar.result)[0];
-
-                if (DBG) {
-                    log ("handleGetPreferredNetworkTypeResponse: modemNetworkMode = " +
-                            modemNetworkMode);
-                }
-
+                if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeResponse: modemNetworkMode = "+modemNetworkMode);
                 int settingsNetworkMode = android.provider.Settings.Secure.getInt(
                         getPhone().getContext().getContentResolver(),
                         android.provider.Settings.Secure.PREFERRED_NETWORK_MODE,
                         Settings.preferredNetworkMode);
 
-                if (DBG) {
-                    log("handleGetPreferredNetworkTypeReponse: settingsNetworkMode = " +
-                            settingsNetworkMode);
-                }
+                if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeReponse: settingsNetworkMode = "+settingsNetworkMode);
 
                 //check that modemNetworkMode is from an accepted value
                 if (modemNetworkMode == Phone.NT_MODE_WCDMA_PREF ||
                         modemNetworkMode == Phone.NT_MODE_GSM_ONLY ||
                         modemNetworkMode == Phone.NT_MODE_WCDMA_ONLY ||
                         modemNetworkMode == Phone.NT_MODE_GSM_UMTS ||
+                        modemNetworkMode == Phone.NT_MODE_LTE_GSM_WCDMA ||
                         modemNetworkMode == Phone.NT_MODE_CDMA ||
                         modemNetworkMode == Phone.NT_MODE_CDMA_NO_EVDO ||
                         modemNetworkMode == Phone.NT_MODE_EVDO_NO_CDMA ||
@@ -130,23 +140,13 @@ public class PhoneToggler extends BroadcastReceiver  {
                         //but it's not true. Double check here
                         (getPhone().getContext().getResources().getBoolean(R.bool.world_phone) == true &&
                             modemNetworkMode == Phone.NT_MODE_GLOBAL) ) {
-                    if (DBG) {
-                        log("handleGetPreferredNetworkTypeResponse: if 1: modemNetworkMode = " +
-                                modemNetworkMode);
-                    }
+                    if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeResponse: if 1: modemNetworkMode = "+modemNetworkMode);
 
                     //check changes in modemNetworkMode and updates settingsNetworkMode
                     if (modemNetworkMode != settingsNetworkMode) {
-                        if (DBG) {
-                            log("handleGetPreferredNetworkTypeResponse: if 2: " +
-                                    "modemNetworkMode != settingsNetworkMode");
-                        }
-
+                        if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeResponse: if 2: modemNetworkMode != settingsNetworkMode");
                         settingsNetworkMode = modemNetworkMode;
-
-                        if (DBG) { log("handleGetPreferredNetworkTypeResponse: if 2: " +
-                                "settingsNetworkMode = " + settingsNetworkMode);
-                        }
+                        if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeResponse: if 2: settingsNetworkMode = "+settingsNetworkMode);
 
                         //changes the Settings.System accordingly to modemNetworkMode
                         android.provider.Settings.Secure.putInt(
@@ -157,8 +157,10 @@ public class PhoneToggler extends BroadcastReceiver  {
                     Intent intent = new Intent(NETWORK_MODE_CHANGED);
                     intent.putExtra(NETWORK_MODE, settingsNetworkMode);
                     getPhone().getContext().sendBroadcast(intent,CHANGE_NETWORK_MODE_PERM);
+                } else if (modemNetworkMode == Phone.NT_MODE_LTE_ONLY) {
+                    if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeResponse: lte only: no action");
                 } else {
-                    if (DBG) log("handleGetPreferredNetworkTypeResponse: else: reset to default");
+                    if (DBG) Log.d(LOG_TAG,"handleGetPreferredNetworkTypeResponse: else: reset to default");
                     resetNetworkModeToDefault();
                 }
             }
@@ -177,9 +179,5 @@ public class PhoneToggler extends BroadcastReceiver  {
             getPhone().setPreferredNetworkType(Settings.preferredNetworkMode,
                     this.obtainMessage(MyHandler.MESSAGE_SET_PREFERRED_NETWORK_TYPE));
         }
-    }
-
-    private static void log(String msg) {
-        Log.d(LOG_TAG, msg);
     }
 }
